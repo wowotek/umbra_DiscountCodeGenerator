@@ -85,14 +85,31 @@ class SavedGiftcard:
 
         return SavedGiftcard(*gcc)
 
-
     def __init__(self, id: str, card_number: str, maximum_usage: int, creation_date: float, expiration_date: float):
         self.id = id
         self.card_number = card_number
         self.maximum_usage = maximum_usage
         self.creation_date = creation_date
         self.expiration_date = expiration_date
+    
+    def __str__(self):
+        maximum_len = max([len(self.id), len(self.card_number), len(str(self.maximum_usage)), len(str(self.creation_date)), len(str(self.expiration_date))])
+        d = [
+            "╭―Giftcard――――――――――" + "―"*(60 - maximum_len) + "╮",
+            "│ ID              : " + str(self.id)              + " "*(60 - maximum_len - len(str(self.id))) + "│",
+            "│ Card Number     : " + str(self.card_number)     + " "*(60 - maximum_len - len(str(self.card_number))) + "│",
+            "│ Maximum Usage   : " + str(self.maximum_usage)   + " "*(60 - maximum_len - len(str(self.maximum_usage))) + "│",
+            "│ Creation Date   : " + str(self.creation_date)   + " "*(60 - maximum_len - len(str(self.creation_date))) + "│",
+            "│ Expiration Date : " + str(self.expiration_date) + " "*(60 - maximum_len - len(str(self.expiration_date))) + "│",
+            "╰―――――――――――――――――――" + "―"*(60 - maximum_len) + "╯"
+        ]
 
+        return "\n".join(d)
+    
+    def __repr__(self):
+        return self.__str__()
+
+# print(SavedGiftcard.parse_giftcard_creation())
 class SavedGiftcardUsage:
     def parse_giftcard_usage(giftcard_usage: str):
         gu = [i for i in giftcard_usage.replace("GIFTCARD_USE(")]

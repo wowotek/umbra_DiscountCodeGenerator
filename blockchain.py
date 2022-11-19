@@ -44,9 +44,11 @@ def activity_user_registration(username: str, password: str):
     __ACTIVITY_POOL.append(a.get_stringed_data())
     return True
 
-def activity_user_password_change(username: str, new_password: str):
+def activity_user_password_change(username: str, old_password: str, new_password: str):
     for i in get_all_user():
         if i.username == username:
+            if not utils.check_password(i.password, i.salt, old_password):
+                return False
             a = Activity_UserPasswordChange(i.id, new_password)
             __ACTIVITY_POOL.append(a.get_stringed_data())
             return True
@@ -68,9 +70,7 @@ def log_in(username: str, password: str):
     global __LOGGED_IN_USER
     for i in get_all_user():
         if i.username == username:
-            sp = pbkdf2_hmac("sha512", bytes(password, "utf-8"), bytes(i.salt, "utf-8"), 500000).hex()
-            if sp == i.password:
-                __LOGGED_IN_USER = i
+            if utils.check_password(i.password, i.salt, password):
                 return True, i
     return False, None
 

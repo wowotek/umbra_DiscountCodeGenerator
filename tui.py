@@ -4,14 +4,13 @@ import time
 import sys
 import os
 import blockchain as BC
-import colorama
+import datetime
 import getch
 import random
 
 # colorama.just_fix_windows_console()
 
 __IS_LOGGED_IN = False
-__IS_MINING = False
 
 def pprint(*args, sep=" ", end="\n", speed=0.0001):
     for i in args:
@@ -51,6 +50,12 @@ def secret_input(prompt: str):
     print()
     return passw
 
+def user_is_logged_in():
+    if not __IS_LOGGED_IN:
+        pprint("You Are not logged in")
+        time.sleep(2)
+        return False
+    return True
 
 ############################################################
 ############################################################
@@ -124,6 +129,7 @@ def main_menu():
                 clear()
 
 def register_user():
+    if not user_is_logged_in(): return
     while True:
         clear()
         print("╭―User Registration――――――――――――――――――――")
@@ -190,11 +196,17 @@ def register_user():
     for i in range(40):
         print("  Registering User... " + a[i % len(a)], end="\r")
         time.sleep(random.randint(100, 500) / 10000)
-    print(username_1)
-    print(password_1)
+    
+    if BC.activity_user_registration(username_1, password_1):
+        pprint("  Registration Added to Pool, waiting for block to be mined.")
+        time.sleep(1.5)
+    else:
+        pprint("  Registration Failed, check again later")
+
     clear()
 
 def change_user_password():
+    if not user_is_logged_in(): return
     while True:
         clear()
         print("╭―User Password Change ― Login――――――――――――")
@@ -256,18 +268,95 @@ def change_user_password():
         else:
             print("╰――――――――――――――――――――――――――――――――――――――\n")
             break
-        
-        
+    
+    a = "-/|\\"
+    for i in range(40):
+        print("  Registering User... " + a[i % len(a)], end="\r")
+        time.sleep(random.randint(100, 500) / 10000)
+    
+    if BC.activity_user_password_change(username_1, password_confirm, password_1):
+        pprint("  Password Change Successfully")
+        time.sleep(1.5)
+    else:
+        pprint("  Password Failed To Change")
+        time.sleep(1.5)
+    
+    clear()
 
 def generate_gift_card():
-    clear()
-    pass
+    if not user_is_logged_in(): return
+    while True:
+        print("╭―Giftcard Creation―――――――――――――――――――――――")
+        print("│ Maximum Usage                :")
+        print("│ Expiration Date (dd/mm/yyyy) :")
+        print("╰―――――――――――――――――――――――――――――――――――――――――")
+        sys.stdout.buffer.write(bytes("\033[F", "utf-8"))
+        sys.stdout.buffer.write(bytes("\033[F", "utf-8"))
+        sys.stdout.buffer.write(bytes("\033[F", "utf-8"))
+        maximum_usage = int(input("│ Maximum Usage                : "))
+        if maximum_usage < 1:
+            pprint("\n\n\n Maximum Usage cannot be less than 1 use")
+            time.sleep(1.5)
+            continue
+        expiration_date = str(input("│ Expiration Date (dd/mm/yyyy) :")).split("/")
+        curtime = datetime.datetime.now()
+
+        day = int(expiration_date[0].rjust(2, "0"))
+        month = int(expiration_date[1].rjust(2, "0"))
+        year = int(expiration_date[2].rjust(4, "0"))
+
+
+        if day <= 0:
+            pprint("\n\n Invalid Day of Month")
+            time.sleep(1.5)
+            continue
+        if day > 31:
+            pprint("\n\n Day of Month cannot be over 31")
+            time.sleep(1.5)
+            continue
+
+        if month <= 0:
+            pprint("\n\n Invalid Month")
+            time.sleep(1.5)
+            continue
+        if month > 12:
+            pprint("\n\n Month cannot be over 12")
+            time.sleep(1.5)
+            continue
+
+        expiration_date = datetime.datetime(year, month, day, 23, 59, 59, 999)
+        if curtime == expiration_date:
+            pprint("\n\n Expiration Date cannot be today")
+            time.sleep(1.5)
+            continue
+
+        if expiration_date < curtime:
+            pprint("\n\n Expiration Date Cannot be day before today")
+            time.sleep(1.5)
+            continue
+
+        break
+    
+    giftcard = BC.activity_giftcard_creation(maximum_usage, time.mktime(expiration_date.timetuple()))
+    a = "-/|\\"
+    for i in range(40):
+        print("  Generating Giftcard... " + a[i % len(a)], end="\r")
+        time.sleep(random.randint(100, 500) / 10000)
+    
+    print()
+    print("This will not be showed again.")
+    print(giftcard)
+    input("Press Enter to Continue...")
+    return
+    
 
 def use_gift_card():
+    if not user_is_logged_in(): return
     clear()
     pass
 
 def export_gift_card():
+    if not user_is_logged_in(): return
     clear()
     pass
     
