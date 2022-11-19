@@ -1,9 +1,10 @@
 from __future__ import annotations
-from hashlib import shake_256, pbkdf2_hmac
+from hashlib import shake_256
 import datetime
 import time
 import uuid, datetime
 import os
+import utils
 
 import settings as SETTINGS
 
@@ -108,8 +109,8 @@ class Activity_UserRegistration:
     def __init__(self, username: str, password: str):
         self.username = username
         self.register_date = time.time()
-        self.salt = shake_256(bytes(str(self.register_date) + str(uuid.uuid4()) + str(os.urandom(8192)), "utf-8")).hexdigest(16)
-        self.password = pbkdf2_hmac("sha512", bytes(password, "utf-8"), bytes(self.salt, "utf-8"), 500000).hex()
+        self.salt = utils.generate_salt()
+        self.password = utils.hash_password(password, self.salt)
         self.id = shake_256(bytes("".join([self.username, self.salt, self.password, str(self.register_date)]), "utf-8")).hexdigest(8)
     
     def get_stringed_data(self):
@@ -134,8 +135,8 @@ class Activity_UserPasswordChange:
     def __init__(self, user_id: str, new_password: str):
         self.user_id = user_id
         self.created = time.time()
-        self.new_salt = shake_256(bytes(str(self.created) + str(uuid.uuid4()) + str(os.urandom(8192)), "utf-8")).hexdigest(16)
-        self.new_password = new_password
+        self.new_salt = utils.generate_salt()
+        self.new_password = utils.hash_password(new_password, self.new_salt)
     
     def get_stringed_data(self):
         return f"USER_PASSWORD_CHANGE(user_id={self.user_id},created={self.created},new_salt={self.new_salt},new_password={self.new_password})"
