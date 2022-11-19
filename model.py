@@ -1,126 +1,271 @@
 from __future__ import annotations
-from hashlib import shake_256
+from hashlib import shake_256, pbkdf2_hmac
 import datetime
-import multiprocessing as mp
 import time
+import uuid, datetime
+import os
+
+import settings as SETTINGS
 
 
-DIFFICULTY = 4
-HASH_BIT_LENGTH = 32
-LOCAL_TIMEZONE = datetime.datetime.now(datetime.timezone.utc).astimezone().tzinfo
+def generate_code(*data: list[str]) -> str:
+    created = str(datetime.datetime.now().strftime("%d%m%yT%H:%M:%S"))
+    uid = str(uuid.uuid4()).replace("-", "")
+    joined_data = uid + "." + created + "." + ".".join(data)
 
-class GiftCard:
-    def __init__(self,
-        card_number: str,
-        use_count: int,
-        nonce: int,
-        created: float,
-        found_nonce_timestamp: float,
-        last_signature: str,
-        last_found_nonce_timestamp: float,
-        last_difficulty: int
-    ):
+    s = shake_256(bytes(joined_data, "utf-8")).hexdigest(8)
+    for _ in range(1000000):
+        s = shake_256(bytes(s, "utf-8")).hexdigest(8)
 
-        self.card_number = card_number
-        self.use_count = use_count
+    n = 4
+    sliced = [str(int(s[i:i+n], 16)).rjust(5, "0") for i in range(0, len(s), n)]
+    return sliced, s
 
-        self.nonce = hex(nonce).replace("0x", "")
-        self.created = time.time() if created == -1 else created
+class SavedUserPasswordChange:
+    def parse_user_password_change(user_password_change: str):
+        upc = [i for i in user_password_change.replace("USER_PASSWORD_CHANGE", "").replace("(", "")]
+        upc.pop()
+        upc = [i.split("=")[1] for i in "".join(upc).split(",")]
+        upc.pop(0)
 
-        self.found_nonce_timestamp = found_nonce_timestamp
-        self.last_signature = last_signature
-        self.last_found_nonce_timestamp = last_found_nonce_timestamp
-        self.last_difficulty = last_difficulty
+        return SavedUser(*upc)
     
-    @property
-    def signature(self):
-        return self.trynonce(self.nonce)[1]
+    def __init__(self, user_id: str, salt: str, password: str):
+        self.user_id = user_id
+        self.salt = salt
+        self.password = password
 
-    @property
-    def is_valid(self):
-        eq = self.signature[-self.difficulty:] == ("0"*self.difficulty)
-        mo = self.signature[-(self.difficulty + 1):] == ("0"*(self.difficulty + 1))
+class SavedUser:
+    def parse_user_registration(user_registration: str):
+        ur = [i for i in user_registration.replace("USER_REGISTRATION", "").replace("(", "")]
+        ur.pop()
+        ur = [i.split("=")[1] for i in "".join(ur).split(",")]
 
-        return mo != eq and self.found_nonce_timestamp != -1
-
-    @property
-    def difficulty(self):
-        if self.created - self.last_found_nonce_timestamp <= 10:
-            return self.last_difficulty + 1
-        
-        if self.created - self.last_found_nonce_timestamp >= 60:
-            return self.last_difficulty - 1
-        
-        if self.created - self.last_found_nonce_timestamp >= 60 * 5:
-            return 2
-        
-        return 1
-
-    def trynonce(self, nonce: int):
-        nonce_hex = hex(nonce).replace("0x", "")
-        sig = shake_256(bytes(f"{self.last_signature}{self.last_found_nonce_timestamp}{self.last_difficulty}{self.created}{self.card_number}{nonce_hex}", "utf-8")).hexdigest(32)
-
-        eq = sig[-self.difficulty:] == ("0"*self.difficulty)
-        mo = sig[-(self.difficulty + 1):] == ("0"*(self.difficulty + 1))
-
-        return eq != mo, sig
+        return SavedUser(*user_registration)
     
-    def sign(self, nonce: int):
-        t = self.trynonce(nonce)
-        if t[0]:
-            self.nonce = nonce
-            self.found_nonce_timestamp = time.time()
-            return True, t[1]
-        return False, t[1]
+    def __init__(self, id: str, username: str, register_date: float, salt: str, password: str):
+        self.id = id
+        self.username = username
+        self.register_date = register_date
+        self.salt = salt
+        self.password = password
 
+    def change_password(self, saved_user_password_change: SavedUserPasswordChange):
+        if saved_user_password_change.user_id != self.id:
+            raise Exception("Invalid User ID Provided")
+        
+        self.salt = saved_user_password_change.salt
+        self.password = saved_user_password_change.password
+
+        return True
+    
     def __str__(self):
-        hexint = hex(self.nonce).replace("0x", "")
-        x = ["|                    Gift Card",
-            f"| DATA ---",
-            f"|   Card Number : {self.card_number}",
-            f"|   Use Count   : {self.use_count}",
-            f"|",
-            f"| METADATA ---",
-            f"|   nonce       : {hexint}",
-            f"|   is valid    : {self.is_valid}",
-            f"|   signature   : {self.signature}",
-            f"|   prev sign   : {self.last_signature}",
-            f"|   difficulty  : {self.difficulty}",
-            f"|   sign t      : {datetime.datetime.fromtimestamp(int(self.found_nonce_timestamp), LOCAL_TIMEZONE)}",
-            f"|   prev sign t : {self.last_found_nonce_timestamp}",
-            f"|   prev diff   : {self.last_difficulty}",
+        j = [
+            f"",
+            f"Saved User",
+            f"| id              : {self.id}",
+            f"| username        : {self.username}",
+            f"| register_date   : {self.register_date}",
+            f"| salt            : {self.salt}",
+            f"| password        : {self.password}",
+            f"+------------------",
         ]
-        m = max([len(i) for i in x])
-        pad = ["+"] + [i for i in "-"* (m + 3)] + ["+"]
-        for i in range(len(x)):
-            d = x[i]
-            d = d.ljust(m + 4, " ")
-            d += "|"
-            x[i] = d
-        x.insert(0, "".join(pad))
-        x.append("".join(pad))
 
-        return "\n".join(x)
+        return "\n".join(j)
     
     def __repr__(self):
         return self.__str__()
 
+class SavedGiftcard:
+    def parse_giftcard_creation(gift_card_creation: str):
+        gcc = [i for i in gift_card_creation.replace("GIFTCARD_CREATE(", "")]
+        gcc.pop()
+        gcc = [i.split("=")[1] for i in "".join(gcc).split(",")]
 
-def job_sign(nonce: int): pass
+        return SavedGiftcard(*gcc)
 
 
+    def __init__(self, id: str, card_number: str, maximum_usage: int, creation_date: float, expiration_date: float):
+        self.id = id
+        self.card_number = card_number
+        self.maximum_usage = maximum_usage
+        self.creation_date = creation_date
+        self.expiration_date = expiration_date
 
-print()
-gc = GiftCard("__INIT__", -1, 0, time.time(), -1, "__INIT__", -1, 2)
-n = 0
-while True:
-    r = gc.sign(n)
-    t2 = time.time()
-    print(*r, n, end="                               \r")
+class SavedGiftcardUsage:
+    def parse_giftcard_usage(giftcard_usage: str):
+        gu = [i for i in giftcard_usage.replace("GIFTCARD_USE(")]
+        gu.pop()
+        gu = [i.split("=")[1] for i in "".join(gu).split(",")]
 
-    if r[0]:
-        break
-    n += 1
-print()
+        return SavedGiftcardUsage(*gu)
+    
+    def __init__(self, id: str, used_on: float):
+        self.id = id
+        self.used_on = used_on
 
-print(gc)
+class Activity_UserRegistration:
+    def __init__(self, username: str, password: str):
+        self.username = username
+        self.register_date = time.time()
+        self.salt = shake_256(bytes(str(self.register_date) + str(uuid.uuid4()) + str(os.urandom(8192)), "utf-8")).hexdigest(16)
+        self.password = pbkdf2_hmac("sha512", bytes(password, "utf-8"), bytes(self.salt, "utf-8"), 500000).hex()
+        self.id = shake_256(bytes("".join([self.username, self.salt, self.password, str(self.register_date)]), "utf-8")).hexdigest(8)
+    
+    def get_stringed_data(self):
+        return f"USER_REGISTRATION(id={self.id},username={self.username},register_date={self.register_date},salt={self.salt},password={self.password})"
+
+    def __str__(self):
+        j = [
+            f"USER CREATION",
+            f"| id              : {self.id}",
+            f"| username        : {self.username}",
+            f"| register_date   : {self.register_date}",
+            f"| salt            : {self.salt}",
+            f"| password        : {self.password}"
+        ]
+
+        return "\n".join(j)
+    
+    def __repr__(self):
+        return self.__str__()
+
+class Activity_UserPasswordChange:
+    def __init__(self, user_id: str, new_password: str):
+        self.user_id = user_id
+        self.created = time.time()
+        self.new_salt = shake_256(bytes(str(self.created) + str(uuid.uuid4()) + str(os.urandom(8192)), "utf-8")).hexdigest(16)
+        self.new_password = new_password
+    
+    def get_stringed_data(self):
+        return f"USER_PASSWORD_CHANGE(user_id={self.user_id},created={self.created},new_salt={self.new_salt},new_password={self.new_password})"
+
+    def __str__(self):
+        j = [
+            f"USER PASSWORD CHANGE",
+            f"| user_id         : {self.user_id}",
+            f"| created         : {self.created}",
+            f"| new_salt        : {self.new_salt}",
+            f"| new_password    : {self.new_password}" 
+        ]
+
+class Activity_GiftCardCreation:
+    def __init__(self, maximum_usage: int, expiration_date: float):
+        gc = generate_code()
+        self.id = gc[1]
+        self.card_number = "-".join(gc[0])
+        self.maximum_usage = maximum_usage
+        self.creation_date = time.time()
+        self.expiration_date = expiration_date
+    
+    def get_stringed_data(self):
+        return f"GIFTCARD_CREATE(id={self.id},card_number={self.card_number},maximum_usage={self.maximum_usage},creation_date={self.creation_date},expiration_date={self.expiration_date})"
+    
+    def __str__(self):
+        j = [
+            f"Gift Card Creation",
+            f"| id              : {self.id}",
+            f"| card_number     : {self.card_number}",
+            f"| maximum_usage   : {self.maximum_usage}",
+            f"| creation_date   : {self.creation_date}",
+            f"| expiration_date : {self.expiration_date}"
+        ]
+
+        return "\n".join(j)
+    
+    def __repr__(self):
+        return self.__str__()
+
+class Activity_GiftCardUsage:
+    def __init__(self, id: str):
+        self.id = id
+        self.used_on = time.time()
+
+    def get_stringed_data(self):
+        return f"GIFTCARD_USE(id={self.id},used_on={self.used_on})"
+    
+    def __str__(self):
+        j = [
+            f"Gift Card Usage",
+            f"| id              : {self.id}",
+            f"| used_on         : {self.used_on}"
+        ]
+
+        return "\n".join(j)
+    
+    def __repr__(self):
+        return self.__str__()
+
+class Block:
+    def parse_saved_block(index_number, signature, miner_id, created_date, activities, nonce, last_block_signature, mined_date):
+        b = Block(index_number, miner_id, last_block_signature, activities.split("_#_"))
+        b.created_date = created_date
+        b.nonce = nonce
+        b.mined_date = mined_date
+
+        if signature != b.signature:
+            raise Exception("Saved signature is not valid with newly created signature")
+        
+        return b
+
+    def __init__(self, index_number: int, miner_id: str, last_block_signature: str, activities: list[str]):
+        self.index_number = index_number
+        self.miner_id = miner_id
+        self.last_block_signature = last_block_signature
+        self.activities = activities
+        self.created_date = time.time()
+        self.nonce = 0
+
+        self.mined_date = -1
+
+    def get_stringed_data(self, nonce):
+        noncehex = hex(nonce).replace("0x", "")
+        joined_activities = "_#_".join(self.activities)
+        return f"BLOCK(index_number={self.index_number},miner_id={self.miner_id},created={self.created_date},activities={joined_activities},nonce={noncehex},last_block_signature={self.last_block_signature})"
+    
+    def get_query_safe_data(self):
+        return (self.index_number, self.signature, self.miner_id, self.created_date, "_#_".join(self.activities), self.nonce, self.last_block_signature, self.mined_date)
+
+    def get_signature_with_nonce(self, target_nonce: int):
+        stringed_data = self.get_stringed_data(target_nonce)
+        return shake_256(bytes(stringed_data, "utf-8")).hexdigest(48)
+
+    @property
+    def signature(self):
+        return self.get_signature_with_nonce(self.nonce)
+
+    @property
+    def valid(self):
+        return self.try_nonce(self.nonce)[0]
+    
+    def try_nonce(self, nonce):
+        sig = self.get_signature_with_nonce(nonce)
+        sig1 = sig[-SETTINGS.DIFFICULTY:]
+        sig2 = sig[-(SETTINGS.DIFFICULTY+1):]
+        return sig1 == ("0"*SETTINGS.DIFFICULTY) and sig2 != ("0"*(SETTINGS.DIFFICULTY+1)), sig
+
+    def sign(self, nonce):
+        if self.try_nonce(nonce)[0]:
+            self.nonce = nonce
+            self.mined_date = time.time()
+            return True
+        return False
+    
+    def __str__(self):
+        j = [
+            f"Block " + ("- Valid" if self.valid else "- Challange"),
+            f"| index_number    : {self.index_number}",
+            f"| miner_id        : {self.miner_id}",
+            f"| activities      :",
+          *[f"|      + " + i.split(",")[0] + ")" for i in self.activities],
+            f"| created         : {self.created_date}",
+            f"| last_block_sign : {self.last_block_signature}",
+            f"| signature       : {self.signature}",
+            f"| nonce           : {self.nonce}",
+            f"| mined_date      : {self.mined_date}"
+        ]
+        
+        return "\n".join(j)
+
+    def __repr__(self):
+        return self.__str__()
