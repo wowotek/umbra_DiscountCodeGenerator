@@ -21,8 +21,12 @@ function hashPassword(password: string, salt: string) {
 }
 
 function comparePassword(savedPassword: string, savedSalt: string, plainTextPassword: string) {
-    const hashedPlainPassword = await hashPassword(plainTextPassword, savedSalt);
+    const hashedPlainPassword = hashPassword(plainTextPassword, savedSalt);
     return hashedPlainPassword == savedPassword;
+}
+
+function anyIsNotExist(datas: Array<unknown | null | undefined>) {
+    return datas.includes(null) || datas.includes(undefined)
 }
 
 
@@ -59,12 +63,46 @@ function log(level: LOG_LEVEL, ...args: Array<string>) {
     process.stdout.write("\n");
 }
 
+
+function splitString(target_string: string, every_n_char: number, filler: string = "0", filters: Array<(a:string) => string> = [(a) => a]){
+    const slen = target_string.length;
+    const n = Math.floor(slen / every_n_char);
+    const remainder = slen - n;
+    const strings = new Array<string>();
+
+    let last_start = 0;
+    for(let i=0; i<n; i++){
+        strings.push(target_string.substring(last_start, last_start + every_n_char));
+        last_start += every_n_char;
+    }
+
+    let lastsub = target_string.substring(last_start, last_start + remainder)
+    const last_remainder_length = every_n_char - lastsub.length;
+    for(let i=0; i<last_remainder_length; i++) {
+        lastsub += filler;
+    }
+
+    strings.push(lastsub);
+
+    const filtered = new Array<string>();
+    for(const filter of filters){
+        for(const string of strings) {
+            filtered.push(filter(string))
+        }
+    }
+
+    return filtered;
+}
+
 export default {
     generateNewSalt,
     hashPassword,
     comparePassword,
+    anyIsNotExist,
 
     logEnable,
     logDisable,
-    log
+    log,
+
+    splitString
 }

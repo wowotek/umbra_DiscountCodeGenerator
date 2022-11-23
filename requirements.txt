@@ -1,0 +1,6 @@
+colorama==0.4.6
+Pillow==9.3.0
+pip==22.3.1
+qrcode==7.3.1
+setuptools==65.5.1
+wheel==0.38.4
