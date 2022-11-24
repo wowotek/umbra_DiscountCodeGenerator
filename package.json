@@ -4,7 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "postinstall": "py -m virtualenv --always-copy venv && source venv/Scripts/activate && py -m pip install -r requirement.txt",
+    "postinstall": "py -m virtualenv --always-copy venv && .\\venv\\Scripts\\python -m pip install -r requirements.txt",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "repository": {
