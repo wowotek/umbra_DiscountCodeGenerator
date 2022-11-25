@@ -1,6 +1,7 @@
 import qrcode
 from PIL import Image, ImageDraw, ImageFont
 import random, io, time
+import sys
 
 
 def random_card_number():
@@ -76,7 +77,7 @@ def generateQrCode(data: str, version: int):
     m = 50
     y = 5
     for i in range(len(mat)):
-        color = "#002366"
+        color = "#1D3F88"
         # if((len(mat) / 2) - 2 <= i <= (len(mat) / 2) + 2):
         #     color = "#0046aa"
         x = 6
@@ -146,7 +147,7 @@ def generateQrCode(data: str, version: int):
         y = y + int(img.size[0]/41)
 
     # Add Eyes
-    eye = get_eye(int(img.size[0]/5.8), "#002366")
+    eye = get_eye(int(img.size[0]/5.8), "#1D3F88")
     img.paste(eye[0], (img.size[0]//21, img.size[0]//21), eye[0])
     img.paste(eye[0], (img.size[0] - int(img.size[0]//4.55), img.size[0]//21), eye[0])
     img.paste(eye[0], (img.size[0]//21, img.size[0] - int(img.size[0]//4.55)), eye[0])
@@ -157,7 +158,7 @@ def generateQrCode(data: str, version: int):
     for i in range(_logo.size[0]):
         for j in range(_logo.size[1]):
             ldraw.point((i+21, j+21), "#ffffff00")
-            ldraw.point((i+21, j+21), "#002366ff" if _logo.getpixel((i, j))[0] == 255 else "#ffffffff")
+            ldraw.point((i+21, j+21), "#1D3F88" if _logo.getpixel((i, j))[0] == 255 else "#ffffffff")
 
     cx = (img.size[0] / 2) - (_logo.size[0] / 2) - 20
     cy = (img.size[1] / 2) - (_logo.size[1] / 2) - 20
@@ -168,10 +169,9 @@ def generateQrCode(data: str, version: int):
     return img
 
 
-def get_giftcard(card_number: str):
-    cd1 = "-".join(card_number)
-    data = "umbra.id/gc-v1-r/" + cd1
-    qr = generateQrCode(data, 2).resize((1117, 1117))
+def generateGiftCard(card_number: str, version: int = 1):
+    data = "umbra.id/gc-v1-r/" + card_number.replace(" ", "-")
+    qr = generateQrCode(data, version).resize((1117, 1117))
     
     # card = Image.open("card_png_generator/asset/giftcard_example.png")
     card  = Image.open("card_png_generator/asset/giftcard_canvas.png")
@@ -180,12 +180,71 @@ def get_giftcard(card_number: str):
     font = ImageFont.truetype("card_png_generator/asset/Poppins-Light.ttf", 60)
 
     padx = 0
-    for i in "  ".join(card_number):
-        draw.text((80+padx, 1294), i, font=font, fill="#DADADA", align="left")
+    for i in " ".join(card_number):
+        draw.text((152+padx, 1294), i, font=font, fill="#ADADAD", align="left")
         padx += 30
 
-    card.paste(qr, (120, 108), qr)
-    card.save("card.png")
+    card.paste(qr, (118, 108), qr)
+    
+    card.save("cards.png")
+    with io.BytesIO() as output:
+        card.save(output, format="png")
+        contents = output.getvalue().hex(" ")
+    
+    return contents
 
-get_giftcard(random_card_number())
+generateGiftCard("hello world", 1)
 
+# args = sys.argv[1::]
+
+# sgiftcard = False
+# sqrcode = False
+# qrversion = 1
+
+# for i in args:
+#     if "--giftcard" in i:
+#         sgiftcard = True
+#     elif "--qronly" in i:
+#         sqrcode = True
+#     elif "--qrversion" in i:
+#         splitted = i.split("=")
+#         if len(splitted) != 2:
+#             print("Invalid QR Version Switch")
+#             exit(1)
+#         else:
+#             if splitted[1] == "" or splitted[1] == " ":
+#                 print("Invalide QR Version Switch")
+#                 exit(1)
+#         try:
+#             qrversion = int(splitted[1], 10)
+#         except:
+#             print("Invalid QR Version Provided")
+#             exit(1)
+
+#         if qrversion not in [1, 2]:
+#             print("only QR Version 1 or 2 is available")
+#             exit(1)
+
+# if sgiftcard and sqrcode:
+#     print("Cannot Generate Both, use either giftcard or qrcode")
+#     exit(1)
+
+# if not sgiftcard and not sqrcode:
+#     print("Please Provide either giftcard or qrcode")
+#     exit(1)
+
+# args = [i for i in args if "-" not in i]
+# data = "-".join(args)
+
+# if sgiftcard:
+#     print(generateGiftCard(data, qrversion))
+#     exit(0)
+
+# if sqrcode:
+#     qr = generateQrCode(data, qrversion)
+#     with io.BytesIO() as output:
+#         qr.save(output, format="png")
+#         contents = output.getvalue().hex(" ")
+    
+#     print(contents)
+#     exit(1)

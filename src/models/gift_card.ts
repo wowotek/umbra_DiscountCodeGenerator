@@ -1,7 +1,19 @@
+import {promisify} from "util";
+import child_process from "child_process";
+
 import { Schema, model } from "mongoose";
 import crypto from "crypto";
 import Utils from "../utilities";
 
+async function _execute(command: string, callback: ((error: child_process.ExecException | null, stdout: string, stderr: string) => void)){
+    child_process.exec(
+        command,
+        { maxBuffer: 1024 * 1024 * 10 },
+        ( error, stdout, stderr ) => { callback(error, stdout, stderr) }
+    )
+}
+
+const execute = promisify(_execute);
 
 export interface IGiftCard {
     card_number: string;
@@ -212,6 +224,17 @@ class GiftCard implements IGiftCard {
 
         return await GiftCard.fetchOne(this.card_number) as GiftCard
     }
+
+    private __last_card_number: string | null = null;
+    private __last_execute: Promise<string> | null = null;
+    public get giftcardPNG() {
+        if(this.__last_card_number == null) this.__last_card_number = this.card_number;
+        if(this.card_number == this.__last_card_number && this.__last_execute != null) return this.__last_execute;
+        this.__last_execute = execute("py card_png_generator/gen.py --giftcard" + this.card_number);
+
+        return this.__last_execute
+    }
 }
+
 
 export default GiftCard;
